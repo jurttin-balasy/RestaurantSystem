@@ -1,0 +1,50 @@
+services:  # Servisler (Konteynerler) dizimi
+
+  # 1-servis: Maǵlıwmatlar bazası (PostgreSQL)
+  db:
+    image: postgres:17-alpine  # Rásmiy, jeńil PostgreSQL
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/  # Maǵlıwmatlardı saqlaw (Persistency)
+    env_file:
+      - .env
+      
+    # ports:
+    #   - "5432:5432" # Kompyuterden bazaǵa kiriw ushın (optional)
+
+  # 2-servis: Biziń Django joybarımız
+  web:
+    build: .  # Dockerfile-di usı papkadan izle hám qur
+    command: python manage.py runserver 0.0.0.0:8080  # Islep shıǵıw ushın
+    # Real deployda: command: gunicorn config.wsgi:application --bind 0.0.0.0:8000
+    volumes:
+      - .:/app  # Kodtı jańalaw (Hot-reload) ushın
+      - static_volume:/app/staticfiles
+    # ports:
+    #   - "8002:8080"  # Brauzerden kiriw ushın
+
+    expose:
+      - 8080
+    # ports:
+    #   - "8080:8080"
+
+    depends_on:
+      - db  # Baza iske túspesten, Django iske túspewi kerek
+    env_file:
+    - .env
+  
+
+  nginx:
+    image: nginx:1.25-alpine 
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf 
+      - static_volume:/home/app/web/staticfiles
+
+    depends_on:
+      - web
+
+
+volumes:
+  postgres_data:  # Baza maǵlıwmatları saqlanatuǵın orın
+  static_volume:
