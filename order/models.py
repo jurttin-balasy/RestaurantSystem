@@ -37,6 +37,15 @@ class Order(models.Model):
     def save(self, *args, **kwargs):
         if self.status == 'CL' and not self.closed_at:
             self.closed_at = timezone.now()
+
+        if self.pk:
+            order = Order.objects.filter(pk=self.pk).first()
+            if order and order.status != "CL" and self.status == 'CL':
+                if self.table:
+                    self.table.status = 'bos'
+                    self.table.save(update_fields=['status'])
+
+                    
         super().save(*args, **kwargs)
 
     def __str__(self):

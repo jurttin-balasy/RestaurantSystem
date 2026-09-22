@@ -46,11 +46,11 @@ class ReservationMe(viewsets.GenericViewSet):
 
         if reservation.status == 'jawildi':
             return Response(
-                {"detail": "Jawilgan brondi biyjar qilip bolmaydi."}, 
+                {"detail": "Jawilgan brondi biykar qilip bolmaydi."}, 
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        reservation.status = 'bikor_etildi'
+        reservation.status = 'biykar_etildi'
         reservation.save()
 
         serializer = self.get_serializer(reservation)
@@ -89,7 +89,7 @@ class AdminReservationViewSet(mixins.ListModelMixin,
             table = updated_reservation.table
             new_status = updated_reservation.status
 
-            if new_status == 'tastiqlandi':
+            if new_status == 'tastiyiqlandi':
                 table.status = 'bant'
                 table.save()
                 

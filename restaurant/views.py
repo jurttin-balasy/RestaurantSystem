@@ -10,7 +10,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAdminUser
 from drf_spectacular.utils import extend_schema
 from rest_framework import permissions
-
+from rest_framework.serializers import ValidationError
 from USErs.serializer import (
     XizmetkerSerializer
 )
@@ -198,6 +198,7 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         if request.method == 'POST':
             serializer = OrderListSerializer(data=request.data)
             if serializer.is_valid():
+
                 xizmetker = getattr(request.user, 'xizmetkerler', None)
 
                 serializer.save(restoran=restaurant, waiter=xizmetker)
@@ -337,6 +338,7 @@ class IngredientDetailStockView(mixins.RetrieveModelMixin,
     queryset = models.Ingredient.objects.all()
     serializer_class = IngredientSerializer
     http_method_names = ['get', 'patch']
+    permission_classes = []
 
     def get_serializer_class(self):
         if self.action == 'stock_in':

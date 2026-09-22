@@ -23,7 +23,7 @@ from .serializers import (
     OrderItemSerializer,
     OrderItemQuantitySerializer, OrderItemUpdateSerializer,
     KDSOrderItemSerializer, KDSStatusUpdateSerializer, 
-    OrderChangeStatusSerializer
+    OrderChangeStatusSerializer, OrderDetailSerializer
 )
 
 
@@ -40,7 +40,7 @@ class OrderItemView(mixins.RetrieveModelMixin,
     queryset = models.Order.objects.all()
     serializer_class = OrderListSerializer
     permission_classes = [OrderItemPermission]
-    http_method_names = ['get', 'post', 'patch', 'put']
+    http_method_names = ['get', 'post', 'patch', 'put', 'delete']
 
 
 
@@ -51,6 +51,9 @@ class OrderItemView(mixins.RetrieveModelMixin,
             return OrderItemListSerializer
         if self.action == 'change_status' and self.request.method == "PATCH":
             return OrderChangeStatusSerializer
+
+        if self.action in ['update', 'partial_update']:
+            return OrderDetailSerializer
         
         return OrderListSerializer
 
@@ -67,6 +70,7 @@ class OrderItemView(mixins.RetrieveModelMixin,
         serializer = self.get_serializer(order, data=request.data, partial=True)
         
         if serializer.is_valid():
+            order.table.status = 'bos'
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -88,6 +92,12 @@ class OrderItemView(mixins.RetrieveModelMixin,
         if request.method == 'POST':
             serializer = self.get_serializer(data=request.data)
             if serializer.is_valid():
+                dish = serializer.validated_data.get('dish')
+                if not dish.is_available:
+                    raise ValidationError(
+                        {"message": "Bul tagam tawsilgan!"}
+                    )
+                
                 serializer.save(order=order)
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -99,67 +109,73 @@ class OrderItemView(mixins.RetrieveModelMixin,
     def send_to_kitchen(self, request, pk=None):
         order = self.get_object()
 
-        pending_items = order.order_items.filter(status="J").select_related('dish')
+        # N+1 so'rov oldini olish uchun recept_items va ingredient-ni birgalikda yuklaymiz
+        pending_items = order.order_items.filter(status="J").select_related('dish').prefetch_related('dish__recept_items__ingredient')
 
         if not pending_items.exists():
             raise ValidationError({"detail": "Bul buyirtpada aspazxanaga jiberiletin tagamalar tabilmadi!"})
 
         with transaction.atomic():
-
             required_totals = defaultdict(Decimal)
 
+            # 1-BOSQICH: Barcha taomlar uchun kerakli masaliqlar miqdorini hisoblab chiqamiz
             for item in pending_items:
                 dish = item.dish
-                recept_items = dish.recept_items.select_related('ingredient').select_for_update(of=('ingredient',))
-
-                for recept_item in recept_items:
+                for recept_item in dish.recept_items.all():
                     ingredient = recept_item.ingredient
+                    if not ingredient:
+                        continue
+
                     unit = recept_item.unit
 
-                    if unit in  ['gr', 'ml']:
-                        required_quantity = (recept_item.quantity_per_serving / 1000) * item.quantity
-
+                    if unit in ['gr', 'ml']:
+                        required_quantity = (Decimal(str(recept_item.quantity_per_serving)) / Decimal('1000')) * item.quantity
                     elif unit == 'mg':
-                        required_quantity = (recept_item.quantity_per_serving / 1000000) * item.quantity
-
+                        required_quantity = (Decimal(str(recept_item.quantity_per_serving)) / Decimal('1000000')) * item.quantity
                     else:
-                        required_quantity = recept_item.quantity_per_serving * item.quantity
+                        required_quantity = Decimal(str(recept_item.quantity_per_serving)) * item.quantity
 
-                    required_totals[recept_item.ingredient] += required_quantity
+                    required_totals[ingredient.id] += required_quantity
 
+            if required_totals:
+                ingredient_ids = list(required_totals.keys())
 
-
-                ingredient_ids = [ing.id for ing in required_totals.keys()]
+                # 2-BOSQICH: Ingredientlarni xavfsiz holatda qulflaymiz (select_for_update)
                 locked_ingredients = Ingredient.objects.filter(id__in=ingredient_ids).select_for_update()
-
                 ingredient_map = {ing.id: ing for ing in locked_ingredients}
 
-                for ingredient, total_required in required_totals.items():
-                    db_ingredient = ingredient_map[ingredient.id]
+                # 3-BOSQICH: Ombordagi zaxirani tekshiramiz
+                for ing_id, total_required in required_totals.items():
+                    db_ingredient = ingredient_map.get(ing_id)
 
-                    if db_ingredient.current_stock < total_required:
+                    if not db_ingredient or db_ingredient.current_stock < total_required:
                         raise ValidationError(
                             {"detail": "Skladta ingredientler jetkiliksiz!"}
                         )
 
-                for ingredient, total_required in required_totals.items():
-                    Ingredient.objects.filter(id=ingredient.id).update(current_stock = F('current_stock') - total_required)
+                # 4-BOSQICH: Ombordan ayiramiz va tranzaksiya tarixini yaratamiz
+                stock_transactions = []
+                for ing_id, total_required in required_totals.items():
+                    Ingredient.objects.filter(id=ing_id).update(current_stock=F('current_stock') - total_required)
 
-                    StockTransaction.objects.create(
-                        type="out",
-                        ingredient = ingredient,
-                        quantity = required_quantity,
-                        reason = f"#{order.id} ushin {required_quantity} mugdar ingredient sheship alindi!"            
+                    stock_transactions.append(
+                        StockTransaction(
+                            type="out",
+                            ingredient_id=ing_id,
+                            quantity=total_required,
+                            reason=f"#{order.id} ushin {total_required} mugdar ingredient sheship alindi!"
                         )
+                    )
 
-                pending_items.update(status='AJ')
+                # Tranzaksiyalarni bitta so'rovda saqlaymiz
+                StockTransaction.objects.bulk_create(stock_transactions)
 
-    
+            # 5-BOSQICH: Taomlar holatini yangilaymiz
+            pending_items.update(status='AJ')
 
         return Response({"detail": "Tagamlar aspazxanaga jiberildi!"}, status=status.HTTP_200_OK)
 
-
-    
+        
 
 
 

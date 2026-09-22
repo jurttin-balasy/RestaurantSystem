@@ -57,8 +57,8 @@ class Table(models.Model):
         current_date = now.date()
         current_time = now.time()
 
-        # Hozirgi vaqtda ushbu stolda aktiv bron bor-yo'qligini tekshiramiz
-        # (reservation_date va reservation_time + duration_hours oralig'ida)
+        # Hazirgi waqitta usi stolda aktiv bron bar -joqligin tekseriw
+        # (reservation_date ham reservation_time + duration_hours araliginda)
         active_reservations = self.reservations.filter(
             reservation_date=current_date,
             status__in=['jaratildi', 'tastiqlandi']
@@ -68,9 +68,9 @@ class Table(models.Model):
             start_dt = datetime.combine(res.reservation_date, res.reservation_time)
             end_dt = start_dt + timedelta(hours=float(res.duration_hours))
             
-            # Agar hozirgi vaqt bron vaqti oralig'ida bo'lsa
+            # Eger hazirgi waqit bron waqti aralig'inda bolsa
             if start_dt <= now <= end_dt:
-                return 'band'
+                return 'bant'
                 
         return 'bos'
 

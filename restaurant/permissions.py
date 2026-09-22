@@ -277,14 +277,29 @@ class DishTogglePermission(BasePermission):
         return False
 
         
-# class IngredientPermission(BasePermission):
-#     def has_permission(self, request, view):
-#         user = request.user
-#         if not (user and user.is_authenticated):
-#             return False
+class IngredientPermission(BasePermission):
+    def has_permission(self, request, view):
+        user = request.user
+        if not (user and user.is_authenticated):
+            return False
 
-#         admin = getattr(user, 'adminler', None)
-#         if (admin and getattr(admin, 'restoran', None)):
-#             return True
+        admin = getattr(user, 'adminler', None)
+        if (admin and getattr(admin, 'restoran', None)):
+            return True
+
+
+        if getattr(view, 'action', None) == 'stock_in':
+
+            sklad_xizmetker = getattr(user, 'Sklad xizmetkeri', None)
+            if (sklad_xizmetker and getattr(sklad_xizmetker, 'restoran', None)):
+                return True
+            
+            admin = getattr(user, 'adminler', None)
+            if (admin and getattr(admin, 'restoran', None)):
+                return True
+
+            return False
+
+            
 
         

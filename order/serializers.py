@@ -97,12 +97,15 @@ class OrderListSerializer(ModelSerializer):
     total_order_price = ReadOnlyField()
     table_number = IntegerField(source='table.number', read_only=True)
 
+    def validate(self, attrs):
+        table = attrs.get('table')
+        if table and table.status == 'bant':
+            raise ValidationError({'table': 'Bul stol bant!'})
+        return attrs
+
     def create(self, validated_data):
         order = super().create(validated_data)
         if order.table:
-            if order.table.status == 'bant':
-                raise ValidationError({'detail': 'Bul stol bant!'})
-            
             order.table.status = 'bant'
             order.table.save(update_fields=['status'])
         return order
@@ -133,7 +136,7 @@ class KDSStatusUpdateSerializer(Serializer):
         choices=["TA", "T"],
         required=True,
         error_messages={
-            "invalid_choice": "Oshpaz faqat 'TA' (Tayyorlanmoqda) yoki 'T' (Tayyor) statusiga o'tkaza oladi!"
+            "invalid_choice": "Aspaz tek 'TA' (Tayyorlanbaqta) yaki 'T' (Tayyar) statusina o'tkize aladi!"
         },
     )
 
@@ -142,3 +145,10 @@ class OrderChangeStatusSerializer(ModelSerializer):
     class Meta:
         model = models.Order
         fields = ('status',)
+    
+
+
+class OrderDetailSerializer(ModelSerializer):
+    class Meta:
+        model = models.Order
+        fields = ('table', 'paymend_method')
