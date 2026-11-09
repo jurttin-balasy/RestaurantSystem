@@ -29,9 +29,17 @@ DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='209.38.103.206,127.0.0.1,localhost').split(',')
 
 CORS_ALLOW_ALL_ORIGINS = True
+
+CORS_ALLOWED_ORIGINS = [
+    "https://resto-table.vercel.app",
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CORS_ALLOW_CREDENTIALS = True 
 CSRF_TRUSTED_ORIGINS = [
+    "https://resto-table.vercel.app",
     'http://localhost:3000',
     'http://127.0.0.1:3000'
 ]
