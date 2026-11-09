@@ -13,9 +13,9 @@ class RestaurantAdmin(admin.ModelAdmin):
 
 @admin.register(models.Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'restoran_id', 'order_index')
+    list_display = ('id', 'name', 'restaurant', 'order_index')
     search_fields = ('name', 'order_index')
-    list_filter = ('restoran_id', )
+    list_filter = ('restaurant', )
 
 
 
@@ -30,20 +30,20 @@ class DishAdmin(admin.ModelAdmin):
 
 @admin.register(models.Table)
 class TableAdmin(admin.ModelAdmin):
-    list_display = ('id', 'number', 'guess_count')
+    list_display = ('id', 'number', 'seats')
 
     search_fields = ('number',)
 
-    list_filter = ('guess_count',)
+    list_filter = ('seats',)
 
 
 @admin.register(models.Ingredient)
 class IngredientAdmin(admin.ModelAdmin):
-    list_display = ('id', 'name', 'current_stock', 'restoran_id')
+    list_display = ('id', 'name', 'current_stock', 'restaurant')
 
     search_fields = ('name', )
 
-    list_filter = ('restoran_id',)
+    list_filter = ('restaurant',)
 
 
 

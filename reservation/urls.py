@@ -3,10 +3,10 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 
-router = DefaultRouter()
+router = DefaultRouter(trailing_slash=False)
 
-router.register('my_reservations', views.ReservationMe, basename='my_reservation')
-router.register('admin_reservations', views.AdminReservationViewSet, basename='admin_reservation')
+router.register('reservations', views.ReservationMe, basename='my_reservation')
+router.register('reservations', views.AdminReservationViewSet, basename='admin_reservation')
 
 urlpatterns = [
     path("", include(router.urls)),

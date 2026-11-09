@@ -2,16 +2,17 @@ from django.db import models
 from django.core.validators import MinValueValidator
 from django.utils import timezone
 from datetime import datetime, timedelta
-
+# from USErs.models import RestoranAdminmodel
 
 class Restaurant(models.Model):
     name = models.CharField(max_length=100, verbose_name='Restoran Ati')
     address = models.CharField(max_length=150, verbose_name='Manzili')
-    phone = models.CharField(max_length=13, verbose_name="Telefon nomeri")
-    # logo = models.ImageField(verbose_name="Restoran logosi", upload_to="C:\\Users\\Acer-pc\\Pictures\\Camera Roll\\psg.png",null=True, blank=True),
-
+    phone = models.CharField(max_length=13, verbose_name="Telefon nomeri", unique=True)
+    logo = models.ImageField(verbose_name="Restoran logosi", null=True, blank=True)
+    start_time = models.TimeField(verbose_name='Ashiliw waqti', default='00:00')
+    end_time = models.TimeField(verbose_name='Jabiliw Waqti', default='00:00')
     is_active = models.BooleanField(default=True, verbose_name='Aktiv/Aktiv emes')
-
+    # admin = models.OneToOneField(RestoranAdminmodel, on_delete=models.SET_NULL, related_name='admin')
     def __str__(self):
         return self.name
 
@@ -19,7 +20,7 @@ class Restaurant(models.Model):
 class Category(models.Model):
     name = models.CharField(max_length=50, verbose_name="Kategoriya ati")
     order_index = models.CharField(max_length=3, verbose_name="Tartip nomeri")
-    restoran = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='categories')
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='categories')
 
     def __str__(self):
         return self.name
@@ -29,7 +30,7 @@ class Dish(models.Model):
     name = models.CharField(max_length=80, verbose_name='Tagam Ati')
     description = models.TextField(null=True, blank=True, verbose_name="Tariypi")
     price = models.DecimalField(verbose_name="Bahasi", max_digits=10, decimal_places=2)
-    # photo = models.ImageField()
+    photo = models.ImageField(null=True, blank=True, verbose_name="Tagam suwreti")
     is_available = models.BooleanField(default=False, verbose_name="Qol jetimliligi")
 
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="dishes")
@@ -40,15 +41,15 @@ class Dish(models.Model):
 
 class Table(models.Model):
     STATUS = (
-        ("bos", 'Bos'),
-        ("bant", "Bant")
+        ("free", 'free'),
+        ("occupied", "occupied")
     )
     number = models.IntegerField(verbose_name="Stol nomeri", default=None)
-    guess_count = models.IntegerField(verbose_name="Orin sani")
-    status = models.CharField(max_length=20, choices=STATUS, verbose_name="Halati") # Choices
+    seats = models.IntegerField(verbose_name="Orin sani")
+    status = models.CharField(max_length=20, choices=STATUS, verbose_name="Halati", default='free') # Choices
     # place = models.CharField(choices=PLACES, verbose_name="jaylasqan orni", null=)
 
-    restoran = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='tables')
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='tables')
 
 
     @property
@@ -61,7 +62,7 @@ class Table(models.Model):
         # (reservation_date ham reservation_time + duration_hours araliginda)
         active_reservations = self.reservations.filter(
             reservation_date=current_date,
-            status__in=['jaratildi', 'tastiqlandi']
+            status__in=['pending', 'confirmed']
         )
 
         for res in active_reservations:
@@ -70,7 +71,7 @@ class Table(models.Model):
             
             # Eger hazirgi waqit bron waqti aralig'inda bolsa
             if start_dt <= now <= end_dt:
-                return 'bant'
+                return 'occupied'
                 
         return 'bos'
 
@@ -114,11 +115,12 @@ class Ingredient(models.Model):
         ('l', 'litr')
     )
 
+    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='ingredients')
     name = models.CharField(verbose_name="Ingredient ati")
     unit = models.CharField(max_length=12, choices=UNITS, verbose_name='Olshem birligi')
     current_stock = models.DecimalField(max_digits=10, decimal_places=3, verbose_name="Mugdari", validators=[MinValueValidator(0)])
-    restoran = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='ingredients')
-
+    min_stock = models.DecimalField(max_digits=10, decimal_places=3, verbose_name='minimum mugdar')
+    
     def __str__(self):
         return self.name
 
@@ -126,8 +128,8 @@ class Ingredient(models.Model):
 
 class StockTransaction(models.Model):
     TYPES = (
-        ('in', "IN",),
-        ('out', "OUT")
+        ('in', "in",),
+        ('out', "out")
     )
 
 

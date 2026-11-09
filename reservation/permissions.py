@@ -16,10 +16,20 @@ class ReservationPermission(permissions.BasePermission):
 
             return request.method in permissions.SAFE_METHODS
 
+        
         customer = getattr(user, 'customers', None)
         if customer:
             return True
 
+
+        waiter = getattr(user, 'xizmetkerler', None)
+        if waiter:
+            if not getattr(waiter, 'is_active', None):
+                self.message = warnings[1]
+                return False
+
+            return True
+            
         return False
 
 
@@ -28,12 +38,16 @@ class ReservationPermission(permissions.BasePermission):
         user = request.user
 
         admin = getattr(user, 'adminler', None)
-        if admin and getattr(admin, 'restoran', None):
-            return obj.restoran == admin.restoran
+        if admin and getattr(admin, 'restaurant', None):
+            return obj == admin.restaurant
 
         customer = getattr(user, 'customers', None)
         if customer:
             return True
+
+        waiter = getattr(user, 'xizmetkerler', None)
+        if waiter and getattr(waiter, 'restaurant', None):
+            return obj == waiter.restaurant
 
         return False
 
@@ -45,12 +59,19 @@ class AdminReservation(permissions.BasePermission):
             return True
 
         admin = getattr(user, 'adminler', None)
+        xizmetker = getattr(user, 'xizmetkerler', None)
         if admin:
             if not getattr(admin, 'is_active', True):
                 self.message = warnings[0]
                 return False
-
             return True
+
+        if xizmetker:
+            if not getattr(xizmetker, 'is_active', True):
+                self.message = warnings[1]
+                return False
+            return request.method in permissions.SAFE_METHODS
+        
 
         return False
 
@@ -58,6 +79,9 @@ class AdminReservation(permissions.BasePermission):
     def has_object_permission(self, request, view, obj):
         user = request.user
         admin = getattr(user, 'adminler', None)
-        return obj.restoran == admin.restoran
-
+        xizmetker = getattr(user, 'xizmetkerler', None)
+        if admin:
+            return obj.restaurant == admin.restaurant
+        if xizmetker:
+            return obj.restaurant == xizmetker.restaurant
     

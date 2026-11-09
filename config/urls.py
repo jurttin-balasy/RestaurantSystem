@@ -28,17 +28,17 @@ from rest_framework_simplejwt.views import (
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/', include('restaurant.urls')),
-    path('users/', include("USErs.urls")),
+    path('api/', include("USErs.urls")),
     path('api/', include('order.urls')),
     path('api/', include('reservation.urls')),
 
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'), # Schema faylın generaciya etedi
+    path('api/schema', SpectacularAPIView.as_view(), name='schema'), # Schema faylın generaciya etedi
     # Optional UI:
     path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
     path('redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
-    path('login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('logout/', TokenBlacklistView.as_view(), name='token-black-list'),
-    path('login/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('sign_up/', CustomerSignUpView.as_view(), name='customer-sign-up'),
+    path('api/auth/login', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/logout', TokenBlacklistView.as_view(), name='token-black-list'),
+    path('api/auth/refresh', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/auth/register', CustomerSignUpView.as_view(), name='customer-sign-up'),
 ]

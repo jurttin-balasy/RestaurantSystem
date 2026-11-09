@@ -2,14 +2,14 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from . import views
 
-router = DefaultRouter()
+router = DefaultRouter(trailing_slash=False)
 
 router.register(r'restaurants', views.RestaurantViewSet, basename='restaurant')
 router.register(r'categories', views.CategoryViewSet, basename='category')
 router.register(r'dishes', views.DishDetailReceptItemView, basename='dish')
 router.register(r'ingredients', views.IngredientDetailStockView, basename='ingredient')
 router.register(r'tables', views.TableViewSet, basename='table')
-
+router.register(r'recipe-items', views.ReceptItemDetailView, basename='receptitem')
 urlpatterns = [
     path("", include(router.urls)),
 

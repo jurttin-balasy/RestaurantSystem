@@ -8,24 +8,26 @@ from django.utils import timezone
 
 
 class CustomerMiniSerializer(serializers.ModelSerializer):
-    username = serializers.CharField(source='user.username', read_only=True)
-
+    phone_number = serializers.CharField(source='user.phone_number', read_only=True)
+    first_name = serializers.CharField(source='user.first_name', read_only=True)
+    last_name = serializers.CharField(source='user.last_name', read_only=True)
+    
     class Meta:
         model = Customer
-        fields = ('username',)
+        fields = ('phone_number', 'first_name', 'last_name')
 
 
 class TableMiniSerializer(serializers.ModelSerializer):
     class Meta:
         model = Table
-        fields = ('restoran', 'number', 'status')
+        fields = ('id', 'restaurant', 'number')
 
 
 
 class RestoranMiniSerializer(serializers.ModelSerializer):
     class Meta:
         model = Restaurant
-        fields = ('name',)
+        fields = ('id', 'name')
 
 
 
@@ -48,7 +50,7 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Reservation
         fields = (
-            'restoran', 
+            'restaurant', 
             'table', 
             'client', 
             'guests_count',
@@ -58,7 +60,7 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
             'reservation_time', 
             'duration_hours'
         )
-        read_only_fields = ('restoran', 'client', 'created_at', 'status')
+        read_only_fields = ('restaurant', 'client', 'created_at', 'status')
 
     def validate(self, attrs):
         table = attrs.get('table')
@@ -81,11 +83,11 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
         view = self.context.get('view')
         restoran_id = None
         if view and hasattr(view, 'kwargs'):
-            restoran_id = view.kwargs.get('restaurant_pk') or view.kwargs.get('pk') or view.kwargs.get('restaurant_id')
+            restoran_id = view.kwargs.get('pk')
 
         # 2. Tanlangan stol usi restoranga tiyisli ekenligini tekseriw
         if table and restoran_id:
-            if str(table.restoran_id) != str(restoran_id):
+            if str(table.restaurant.id) != str(restoran_id):
                 raise serializers.ValidationError({
                     "table": "Bul stol bul restoranga tiyisli emes!"
                 })
@@ -100,7 +102,7 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
             existing_reservations = models.Reservation.objects.filter(
                 table=table,
                 reservation_date=res_date,
-                status__in=['jaratildi', 'tastiqlandi']
+                status__in=['jaratildi', 'tastiyiqlandi']
             )
 
             # eger UPDATE boip atirgan bolsa
@@ -132,15 +134,17 @@ class ReservationListSerializer(serializers.ModelSerializer):
 
     )
     
-    client = CustomerMiniSerializer(source='user.username', read_only=True)
+    client = CustomerMiniSerializer(read_only=True)
     table = TableMiniSerializer(read_only=True)
-    restoran = RestoranMiniSerializer(read_only=True)
+    restaurant = RestoranMiniSerializer(read_only=True)
     class Meta:
         model = models.Reservation
         fields = (
-            'restoran',
+            'id',
+            'restaurant',
             'table',
             'client',
+            'guests_count',
             'reservation_date',
             'reservation_time',
             'duration_hours',
@@ -150,7 +154,7 @@ class ReservationListSerializer(serializers.ModelSerializer):
 
 
 class ReservationMeSerializer(serializers.ModelSerializer):
-    restoran  = RestoranMiniSerializer(read_only=True)
+    restaurant  = RestoranMiniSerializer(read_only=True)
     table = TableMiniSerializer(read_only=True)
     
     reservation_date = serializers.DateField(
@@ -166,14 +170,15 @@ class ReservationMeSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Reservation
-        fields = ('restoran', 'table', 'reservation_date', 'status', 'reservation_time', 'duration_hours')
+        fields = ('restaurant', 'table', 'reservation_date', 'status', 'reservation_time', 'duration_hours')
 
 
 
 class ReservationStatusUpdateSerializer(serializers.ModelSerializer):
+    client = CustomerMiniSerializer(read_only=True)
     class Meta:
         model = models.Reservation
-        fields = ('id', 'status')
+        fields = ('id', 'status', 'client')
 
     def update(self, instance, validated_data):
         new_status = validated_data.get('status', instance.status)

@@ -2,9 +2,10 @@ from rest_framework.routers import DefaultRouter
 from . import views
 from django.urls import path, include
 
-router = DefaultRouter()
-router.register(r'adminler', views.RestoranAdminViewSet, basename='adminler')
-router.register(r'customers', views.CustomerListView, basename='customer')
+router = DefaultRouter(trailing_slash=False)
+router.register(r'admins', views.RestoranAdminViewSet, basename='adminler')
+router.register(r'staff', views.XizmetkerDetailView, basename='staff')
+router.register(r'users', views.UserView, basename='user')
 
 urlpatterns = [
     # Mijoz ro'yxatdan o'tishi uchun maxsus URL

@@ -1,5 +1,4 @@
-from rest_framework import generics, viewsets, mixins
-from rest_framework.views import APIView
+from rest_framework import viewsets, mixins
 from rest_framework.decorators import action
 from drf_spectacular.utils import extend_schema
 from rest_framework.serializers import ValidationError
@@ -11,12 +10,11 @@ from . import models
 from restaurant.models import StockTransaction, Ingredient
 
 
-
+from django.utils import timezone
 from django.db import transaction
 from django.db.models import F 
 from collections import defaultdict
 from decimal import Decimal
-
 
 from .serializers import (
     OrderListSerializer, OrderItemListSerializer,
@@ -29,7 +27,7 @@ from .serializers import (
 
 from .permissions import (
     OrderItemPermission,OrderItemUpdatePermision,
-    IsKitchenStaffPermission
+    IsKitchenStaffPermission, OrderItemWaiterUpdatePermission
 )
 
 # orders/id/order_items/
@@ -40,6 +38,7 @@ class OrderItemView(mixins.RetrieveModelMixin,
     queryset = models.Order.objects.all()
     serializer_class = OrderListSerializer
     permission_classes = [OrderItemPermission]
+    pagination_class = None
     http_method_names = ['get', 'post', 'patch', 'put', 'delete']
 
 
@@ -59,18 +58,19 @@ class OrderItemView(mixins.RetrieveModelMixin,
 
 
     @extend_schema(methods=["PATCH"], request=OrderChangeStatusSerializer, responses={200:OrderChangeStatusSerializer})
-    @action(detail=True, methods=['patch'], url_path='change_status')
+    @action(detail=True, methods=['patch'], url_path='status')
     def change_status(self, request, pk=None):
         order = self.get_object()
 
-        if order.status == 'CL':
+        if order.status == 'closed':
             raise ValidationError({'detail': "Siz bul orderdi qayta asha almaysiz"})
 
 
         serializer = self.get_serializer(order, data=request.data, partial=True)
         
         if serializer.is_valid():
-            order.table.status = 'bos'
+            order.table.status = 'free'
+            order.closed_at = timezone.now()
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
@@ -109,8 +109,8 @@ class OrderItemView(mixins.RetrieveModelMixin,
     def send_to_kitchen(self, request, pk=None):
         order = self.get_object()
 
-        # N+1 so'rov oldini olish uchun recept_items va ingredient-ni birgalikda yuklaymiz
-        pending_items = order.order_items.filter(status="J").select_related('dish').prefetch_related('dish__recept_items__ingredient')
+        pending_items = order.order_items.filter(status="new").select_related('dish').prefetch_related('dish__recept_items__ingredient')
+        count_items = order.order_items.filter(status='new').count()
 
         if not pending_items.exists():
             raise ValidationError({"detail": "Bul buyirtpada aspazxanaga jiberiletin tagamalar tabilmadi!"})
@@ -118,7 +118,7 @@ class OrderItemView(mixins.RetrieveModelMixin,
         with transaction.atomic():
             required_totals = defaultdict(Decimal)
 
-            # 1-BOSQICH: Barcha taomlar uchun kerakli masaliqlar miqdorini hisoblab chiqamiz
+          
             for item in pending_items:
                 dish = item.dish
                 for recept_item in dish.recept_items.all():
@@ -140,11 +140,11 @@ class OrderItemView(mixins.RetrieveModelMixin,
             if required_totals:
                 ingredient_ids = list(required_totals.keys())
 
-                # 2-BOSQICH: Ingredientlarni xavfsiz holatda qulflaymiz (select_for_update)
+                # Ingredientlerdi qawipsiz halatda qulplaymiz (select_for_update)
                 locked_ingredients = Ingredient.objects.filter(id__in=ingredient_ids).select_for_update()
                 ingredient_map = {ing.id: ing for ing in locked_ingredients}
 
-                # 3-BOSQICH: Ombordagi zaxirani tekshiramiz
+                # Skladtagi mugdardi tekseremiz
                 for ing_id, total_required in required_totals.items():
                     db_ingredient = ingredient_map.get(ing_id)
 
@@ -153,7 +153,7 @@ class OrderItemView(mixins.RetrieveModelMixin,
                             {"detail": "Skladta ingredientler jetkiliksiz!"}
                         )
 
-                # 4-BOSQICH: Ombordan ayiramiz va tranzaksiya tarixini yaratamiz
+                # Skladtan ayiramiz ham tranzaksiya tariyxin jaratamiz
                 stock_transactions = []
                 for ing_id, total_required in required_totals.items():
                     Ingredient.objects.filter(id=ing_id).update(current_stock=F('current_stock') - total_required)
@@ -167,13 +167,14 @@ class OrderItemView(mixins.RetrieveModelMixin,
                         )
                     )
 
-                # Tranzaksiyalarni bitta so'rovda saqlaymiz
+                # Tranzaksiyalardi bir sorawda saqlaymiz
                 StockTransaction.objects.bulk_create(stock_transactions)
 
-            # 5-BOSQICH: Taomlar holatini yangilaymiz
-            pending_items.update(status='AJ')
+            # tagamlar stastusin janalaymiz
+            pending_items.update(status='sent', sent_at=timezone.now())
+            
 
-        return Response({"detail": "Tagamlar aspazxanaga jiberildi!"}, status=status.HTTP_200_OK)
+        return Response({"detail": "Tagamlar aspazxanaga jiberildi!", "sent_items": count_items}, status=status.HTTP_200_OK)
 
         
 
@@ -184,12 +185,10 @@ class OrderItemView(mixins.RetrieveModelMixin,
 
 
 
+# order-items/id/  --- GET, PUT
+# order-items/id/quantity/  --- PATCH(quantity)
+# order-items/serve -- PATCH(status='served')
 
-
-
-
-# order_items/id/  --- GET, PUT
-# order_items/id/quantity/  --- PATCH(quantity)
 class OrderItemDetailView(
                 mixins.RetrieveModelMixin,
                 mixins.DestroyModelMixin,
@@ -199,21 +198,28 @@ class OrderItemDetailView(
     serializer_class = OrderItemUpdateSerializer
     permission_classes = [IsAuthenticated, OrderItemUpdatePermision]
     http_method_names = ['get', 'put', 'delete', 'patch']
-    
+
     def get_serializer_class(self):
         if self.action == 'quantity':
             if self.request.method == 'PATCH':
                 return OrderItemQuantitySerializer
         return OrderItemUpdateSerializer
+
+    def get_permissions(self):
+        if self.action == 'serve':
+            return [OrderItemWaiterUpdatePermission()]
+        return super().get_permissions()    
+
     
     def get_queryset(self):
         user = self.request.user
         xizmetker = getattr(user, "xizmetkerler", None)
         if xizmetker:
             return models.OrderItem.objects.filter(
-                order__restoran=xizmetker.restoran
+                order__restaurant=xizmetker.restaurant
             )
         return models.OrderItem.objects.none()
+
 
     @action(detail=True, methods=["patch"], url_path="quantity")
     def quantity(self, request, pk=None):
@@ -236,18 +242,35 @@ class OrderItemDetailView(
             OrderItemSerializer(order_item).data, status=status.HTTP_200_OK
         )
 
+    @extend_schema(methods=['PATCH'], request=None, responses={200: OrderItemListSerializer})
+    @action(detail=True, methods=['patch'], url_path='serve')
+    def serve(self, request, pk=None):
+        order_item = self.get_object()
+
+        if order_item.status != 'ready':
+            return Response(
+                {"detail": "Bu tagam tayyar bolmadi!"}, 
+                status=status.HTTP_400_BAD_REQUEST      
+            )
+        
+        with transaction.atomic():
+            order_item.status = 'served'
+            order_item.save(update_fields=['status'])
+        order_item.refresh_from_db()
+
+        return Response(OrderItemListSerializer(order_item).data, status=status.HTTP_200_OK)
+
+
+
+
 
     
 
 
 
 
-# kitchen/order_items/
+# api/kitchen/items/
 class KDSOrderItemViewSet(viewsets.ReadOnlyModelViewSet):
-    """Oshpazxona ekrani (KDS) uchun ViewSet.
-
-    Faqat 'AJ' va 'TA' statusdagi taomlar ko'rinadi.
-    """
 
     queryset = models.OrderItem.objects.all()
     serializer_class = KDSOrderItemSerializer
@@ -265,10 +288,10 @@ class KDSOrderItemViewSet(viewsets.ReadOnlyModelViewSet):
         # 3. Order yaratilgan vaqti (order__created_at) bo'yicha saralash
         return (
             models.OrderItem.objects.filter(
-                order__restoran=xizmetker.restoran, status__in=["AJ", "TA"]
+                order__restaurant=xizmetker.restaurant, status__in=["sent", "cooking"]
             )
             .select_related("dish", "order", "order__table", "order__waiter")
-            .order_by("order__created_at")
+            .order_by("sent_at")
         )
 
 
@@ -276,8 +299,8 @@ class KDSOrderItemViewSet(viewsets.ReadOnlyModelViewSet):
         request= KDSStatusUpdateSerializer,
         responses={200:KDSOrderItemSerializer},
     )
-    @action(detail=True, methods=["patch"], url_path="change-status")
-    def change_status(self, request, pk=None):
+    @action(detail=True, methods=["patch"], url_path="status")
+    def status(self, request, pk=None):
         order_item = self.get_object()
 
         serializer = KDSStatusUpdateSerializer(data=request.data)
@@ -285,12 +308,12 @@ class KDSOrderItemViewSet(viewsets.ReadOnlyModelViewSet):
 
         new_status = serializer.validated_data["status"]
 
-        ALLOWED_KITCHEN_STATUSES = ["TA", "T"]
+        ALLOWED_KITCHEN_STATUSES = ["cooking", "ready"]
 
         if new_status not in ALLOWED_KITCHEN_STATUSES:
             raise ValidationError(
                 {
-                    "status": f"Aspaz statusni faqat {ALLOWED_KITCHEN_STATUSES} ga o'zgartira oladi!"
+                    "status": f"Aspaz statusti tek {ALLOWED_KITCHEN_STATUSES} larina o'zgarte aladi!"
                 }
             )
 
@@ -303,97 +326,3 @@ class KDSOrderItemViewSet(viewsets.ReadOnlyModelViewSet):
             KDSOrderItemSerializer(order_item).data,
             status=status.HTTP_200_OK,
         )
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# class SendToKitchenView(APIView):
-#     def post(self, request, order_id):
-#         order = get_object_or_404(models.Order, id=order_id)
-        
-#         user = request.user
-#         xizmetker = getattr(user, 'xizmetkerler', None)
-        
-#         if not xizmetker or xizmetker.restoran != order.restoran or xizmetker.role != "Officiant":
-#             return Response({"error": "Sizda bu buyurtmani oshpazxonaga yuborish huquqi yo'q!"}, status=status.HTTP_403_FORBIDDEN)
-
-#         new_items = order.order_items.filter(status='J')
-#         if not new_items.exists():
-#             return Response({"error": "Yuborish uchun yangi taomlar topilmadi."}, status=status.HTTP_400_BAD_REQUEST)
-
-#         missing_ingredients = []
-
-#         with transaction.atomic():
-#             for item in new_items:
-#                 dish = item.dish
-#                 multiplier = item.quantity
-#                 recipe_items = dish.recept_items.all()
-
-#                 for recipe in recipe_items:
-#                     ingredient = recipe.ingredient
-#                     required_qty = recipe.quantity_per_serving * multiplier
-                    
-#                     if ingredient.current_stock < required_qty:
-#                         missing_ingredients.append({
-#                             "dish": dish.name,
-#                             "ingredient": ingredient.name,
-#                             "required": float(required_qty),
-#                             "available": float(ingredient.current_stock),
-#                             "unit": ingredient.unit
-#                         })
-
-#             if missing_ingredients:
-#                 return Response({
-#                     "error": "Omborda yetarli masalliq yo'q!",
-#                     "missing_items": missing_ingredients
-#                 }, status=status.HTTP_400_BAD_REQUEST)
-
-#             for item in new_items:
-#                 dish = item.dish
-#                 multiplier = item.quantity
-#                 recipe_items = dish.recept_items.all()
-
-#                 for recipe in recipe_items:
-#                     unit = recipe.unit
-#                     ingredient = recipe.ingredient
-#                     required_qty = recipe.quantity_per_serving * multiplier
-
-#                     if unit =='gr':
-#                         ingredient.current_stock -= required_qty / 1000
-#                         ingredient.save()
-#                     if unit == 'mg':
-#                         ingredient.current_stock -= required_qty / 1000000
-#                         ingredient.save()
-#                     if unit == 'ml':
-#                         ingredient.current_stock -= required_qty / 1000
-#                         ingredient.save() 
-
-#                     ingredient.current_stock -= required_qty
-#                     ingredient.save()
-
-                    
-#                     StockTransaction.objects.create(
-#                         type='out',
-#                         quantity=required_qty,
-#                         reason=f"Order #{order.id} - {dish.name}",
-#                         ingredient=ingredient
-#                     )
-
-#                 item.status = 'AJ'
-#                 item.save()
-
-#         return Response({"message": "Buyurtpalar aspazxanaga jiberildi ham ingredientler sheshildi!"}, status=status.HTTP_200_OK)

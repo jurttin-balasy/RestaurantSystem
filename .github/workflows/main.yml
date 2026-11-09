@@ -1,0 +1,65 @@
+name: Django CI  # 1. Workflow atı
+
+# 2. Trigger (Qashan iske túsedi?)
+on:
+  push:
+    branches: [ "main" ]  # main tarmaǵına push qılınǵanda
+  pull_request:
+    branches: [ "main" ]  # main-ge pull request jiberilgende
+
+# 3. Jumıslar (Jobs)
+jobs:
+  build-and-test:
+    # Virtual kompyuter túri (Ubuntu Linux)
+    runs-on: ubuntu-latest
+    
+    # PostgreSQL servisi
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: test_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        # Baza tolıq iske túskenshe kútiw ushın tekseriw (Health check)
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    # 4. Qádemler (Steps)
+    steps:
+    # A) Kodtı GitHub repozitoriyinen virtual kompyuterge kóshirip alıw
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    # B) Python 3.9 dı virtual kompyuterge ornatıw
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    # C) Kitapxanalardı ornatıw
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 psycopg2-binary
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+      # Túsindirme:
+      # 1. pip-ti jańalaydı.
+      # 2. Test ushın kerek flake8 hám pytest-ti ornatadı.
+      # 3. requirements.txt bar bolsa, ondaǵı barlıq kitapxanalardı ornatadı.
+
+    # D) Kod stilin tekseriw (Linter)
+    - name: Lint with flake8
+      run: |
+        # E9, F63, F7, F82 - bular sintaksis qátelikleri (kod islemeydi)
+        # Eger bular shıqsa, process toqtaydı.
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+
+        # Qalǵan stil qátelikleri (mısalı, qatar uzınlıǵı 120 belgiden kóp bolsa)
+        # --exit-zero: Bul qátelikler ushın process toqtamasın (tek eskertiw).
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics

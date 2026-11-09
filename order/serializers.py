@@ -14,6 +14,8 @@ from drf_spectacular.utils import extend_schema_field
 
 
 class OrderItemSerializer(ModelSerializer):
+    # waiting_time_minutes = ReadOnlyField()
+
     class Meta:
         model = models.OrderItem
         fields = ('id', 'order', 'dish', 'quantity', 'status', 'note')
@@ -41,7 +43,8 @@ class OrderItemListSerializer(ModelSerializer):
     dish = CharField(source = 'dish.name', read_only=True)
     dish_price = DecimalField(source='dish.price', max_digits=10, decimal_places=2, read_only=True)
     total_price = ReadOnlyField()
-        
+    
+   
     
     class Meta:
         model = models.OrderItem
@@ -73,15 +76,14 @@ class KDSOrderItemSerializer(ModelSerializer):
             "quantity",
             "status",
             "waiter_name",
+            'sent_at',
             "waiting_time_minutes",
         ]
-    @extend_schema_field(IntegerField())
+   
     def get_waiter_name(self, obj):
         if obj.order.waiter:
-            return (
-                f"{obj.order.waiter.user.first_name} {obj.order.waiter.user.last_name}"
-            )
-        return "Noma'lum"
+            return f"{obj.order.waiter.user.first_name} {obj.order.waiter.user.last_name}"
+        return "null"
 
     @extend_schema_field(IntegerField())
     def get_waiting_time_minutes(self, obj):
@@ -96,17 +98,18 @@ class OrderListSerializer(ModelSerializer):
     order_items = OrderItemListSerializer(many=True, read_only=True)
     total_order_price = ReadOnlyField()
     table_number = IntegerField(source='table.number', read_only=True)
-
+    waiter_name = SerializerMethodField()
+   
     def validate(self, attrs):
         table = attrs.get('table')
-        if table and table.status == 'bant':
+        if table and table.status == 'occupied':
             raise ValidationError({'table': 'Bul stol bant!'})
         return attrs
 
     def create(self, validated_data):
         order = super().create(validated_data)
         if order.table:
-            order.table.status = 'bant'
+            order.table.status = 'occupied'
             order.table.save(update_fields=['status'])
         return order
 
@@ -114,9 +117,9 @@ class OrderListSerializer(ModelSerializer):
     def update(self, instance, validated_data):
         new_status = validated_data.get('status', instance.status)
 
-        if new_status == 'CL' and instance.table:
+        if new_status == 'closed' and instance.table:
             table = instance.table
-            table.status = 'bos'
+            table.status = 'free'
             table.save()
 
         instance.status = new_status
@@ -127,16 +130,22 @@ class OrderListSerializer(ModelSerializer):
     
     class Meta:
         model = models.Order
-        fields = ('id', 'restoran', 'waiter','table', 'table_number', 'status', 'paymend_method', 'order_items', 'total_order_price')
-        read_only_fields = ('restoran', 'waiter')
+        fields = ('id', 'restaurant', 'waiter', 'waiter_name', 'table', 'table_number', 'status', 'payment_method', 'created_at', 'closed_at', 'order_items', 'total_order_price')
+        read_only_fields = ('restaurant', 'waiter', 'created_at', 'closed_at')
+
+    # @extend_schema_field(IntegerField())
+    def get_waiter_name(self, obj):
+        if obj.waiter:
+            return f"{obj.waiter.user.first_name} {obj.waiter.user.last_name}"
+        return None
 
 
 class KDSStatusUpdateSerializer(Serializer):
     status = ChoiceField(
-        choices=["TA", "T"],
+        choices=["cooking", "ready"],
         required=True,
         error_messages={
-            "invalid_choice": "Aspaz tek 'TA' (Tayyorlanbaqta) yaki 'T' (Tayyar) statusina o'tkize aladi!"
+            "invalid_choice": "Aspaz tek 'cooking' (Tayyorlanbaqta) yaki 'ready' (Tayyar) statusina o'tkize aladi!"
         },
     )
 
@@ -151,4 +160,4 @@ class OrderChangeStatusSerializer(ModelSerializer):
 class OrderDetailSerializer(ModelSerializer):
     class Meta:
         model = models.Order
-        fields = ('table', 'paymend_method')
+        fields = ('table', 'payment_method')

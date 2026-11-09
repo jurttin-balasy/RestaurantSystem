@@ -22,12 +22,12 @@ class IsRestoranAdmin(BasePermission):
             return False
 
         admin = getattr(user, 'adminler', None)
-        if admin and getattr(admin, 'restoran'):
+        if admin and getattr(admin, 'restaurant'):
             if not user.adminler.is_active:
                 self.message = warnings[0]
                 return False
             
-            return view.kwargs['pk'] == admin.restoran.id
+            return view.kwargs['pk'] == admin.restaurant.id
         
         return False
 
@@ -38,8 +38,8 @@ class IsRestoranAdmin(BasePermission):
                 self.message = warnings[0]
                 return False
             
-            if hasattr(obj, 'restoran'):
-                return obj.restoran.id == user.adminler.restoran.id
+            if hasattr(obj, 'restaurant'):
+                return obj.restaurant.id == user.adminler.restaurant.id
             return False
         return False
 
@@ -58,7 +58,7 @@ class XizmetkerDetailPermission(BasePermission):
                 self.message = "Siz aktiv emessiz. Super Adminge muraja etin!"
                 return False
 
-            if getattr(admin, 'restoran', None):
+            if getattr(admin, 'restaurant', None):
                 return True
 
         return False
@@ -67,14 +67,12 @@ class XizmetkerDetailPermission(BasePermission):
         user = request.user
         admin = getattr(user, 'adminler', None)
 
-        if admin and getattr(admin, 'restoran', None):
+        if admin and getattr(admin, 'restaurant', None):
             if not getattr(admin, 'is_active', True):
-                self.message = "Siz aktiv emessiz. Super Adminge muraja etin!"
+                self.message = "Siz aktiv emessiz. Super Adminge murajat etin!"
                 return False
             
-            if hasattr(obj, 'restoran'):
-                return obj.restoran == admin.restoran
+            if hasattr(obj, 'restaurant'):
+                return obj.restaurant == admin.restaurant
             return False
 
-    
-        
