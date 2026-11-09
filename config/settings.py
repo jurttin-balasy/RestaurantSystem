@@ -31,6 +31,7 @@ ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='209.38.103.206,127.0.0.1,localh
 CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOWED_ORIGINS = [
+    "https://resto-table.uz"
     "https://resto-table.vercel.app",
     "http://localhost:3000",
     "http://127.0.0.1:3000",
@@ -39,6 +40,8 @@ CORS_ALLOWED_ORIGINS = [
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CORS_ALLOW_CREDENTIALS = True 
 CSRF_TRUSTED_ORIGINS = [
+    "https://resto-table.uz",
+    "https://www.resto-table.uz",
     "https://resto-table.vercel.app",
     'http://localhost:3000',
     'http://127.0.0.1:3000'
