@@ -1,0 +1,38 @@
+services:
+  db:
+    image: postgres:17-alpine
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    env_file:
+      - .env
+
+  web:
+    build: .
+    command: python manage.py runserver 0.0.0.0:8080
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      
+    expose:
+      - 8080
+    depends_on:
+      - db
+    env_file:
+      - .env  # O'zgartirilgan joy: Oldin bu yer xato yozilgan edi
+
+
+
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+    volumes:
+      # DIQQAT: Biz endi local.conf faylın qollanamız!
+      - ./nginx/local.conf:/etc/nginx/conf.d/default.conf
+      - static_volume:/home/app/web/staticfiles
+      - media_volume:/home/app/web/media
+    depends_on:
+      - web
+
+  # Certbot servisi lokal kompyuterge kerek emes, alıp taslasańız boladı.
