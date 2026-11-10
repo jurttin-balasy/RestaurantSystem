@@ -43,6 +43,8 @@ CSRF_TRUSTED_ORIGINS = [
     "https://resto-table.uz",
     "https://www.resto-table.uz",
     "https://resto-table.vercel.app",
+    'http://localhost',
+    'http://127.0.0.1'
     # 'http://localhost:3000',
     # 'http://127.0.0.1:3000'
 ]
