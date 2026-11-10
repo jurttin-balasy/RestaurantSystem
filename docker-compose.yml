@@ -19,6 +19,9 @@ services:
     env_file:
       - .env  # O'zgartirilgan joy: Oldin bu yer xato yozilgan edi
 
+
+
+
   nginx:
     image: nginx:1.25-alpine
     ports:
@@ -28,8 +31,20 @@ services:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
       - /etc/letsencrypt:/etc/letsencrypt:ro
       - static_volume:/home/app/web/staticfiles
+      - media_volume:home/app/web/media
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+
     depends_on:
       - web
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - certbot_conf:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+
+
 
 
 
@@ -50,3 +65,6 @@ services:
 volumes:
   postgres_data:
   static_volume:
+
+  certbot_conf:
+  certbot_www:
