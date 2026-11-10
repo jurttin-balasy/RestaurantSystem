@@ -59,7 +59,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         elif hasattr(obj, 'customers'):
             return obj.customers.role
         elif obj.is_superuser:
-            return "superuser"
+            return "superadmin"
         return None
 
 
