@@ -26,7 +26,7 @@ from rest_framework_simplejwt.views import (
 )
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('admin', admin.site.urls),
     path('api/', include('restaurant.urls')),
     path('api/', include("USErs.urls")),
     path('api/', include('order.urls')),
@@ -34,8 +34,8 @@ urlpatterns = [
 
     path('api/schema', SpectacularAPIView.as_view(), name='schema'), # Schema faylın generaciya etedi
     # Optional UI:
-    path('docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    path('docs', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('redoc', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
 
     path('api/auth/login', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/logout', TokenBlacklistView.as_view(), name='token-black-list'),
