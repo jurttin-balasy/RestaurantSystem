@@ -47,6 +47,11 @@ CSRF_TRUSTED_ORIGINS = [
     # 'http://127.0.0.1:3000'
 ]
 
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+
+
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
