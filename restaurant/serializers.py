@@ -37,7 +37,7 @@ class RestaurantListSerializer(ModelSerializer):
 
     def get_admin(self, obj):
         adminler = RestoranAdminmodel.objects.filter(restaurant=obj)
-        serializer = AdminMiniSerializer(adminler, many=True)
+        serializer = AdminMiniSerializer(adminler)
         return serializer.data
 
 
