@@ -26,8 +26,14 @@ SECRET_KEY = config('SECRET_KEY', default='django-insecure-default-key')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='209.38.103.206,127.0.0.1,localhost').split(',')
+# ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='209.38.103.206,127.0.0.1,localhost').split(',')
 
+# Env matnini ajratish va tirnoq/bo'sh joylardan tozalash
+raw_allowed = os.getenv('ALLOWED_HOSTS', '*')
+ALLOWED_HOSTS = [h.strip().strip("'\"") for h in raw_allowed.split(',') if h.strip()]
+
+raw_csrf = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://127.0.0.1,http://localhost')
+CSRF_TRUSTED_ORIGINS = [c.strip().strip("'\"") for c in raw_csrf.split(',') if c.strip()]
 CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOWED_ORIGINS = [
@@ -39,15 +45,15 @@ CORS_ALLOWED_ORIGINS = [
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CORS_ALLOW_CREDENTIALS = True 
-CSRF_TRUSTED_ORIGINS = [
-    "https://resto-table.uz",
-    "https://www.resto-table.uz",
-    "https://resto-table.vercel.app",
-    'http://localhost',
-    'http://127.0.0.1'
-    # 'http://localhost:3000',
-    # 'http://127.0.0.1:3000'
-]
+# CSRF_TRUSTED_ORIGINS = [
+#     "https://resto-table.uz",
+#     "https://www.resto-table.uz",
+#     "https://resto-table.vercel.app",
+#     'http://localhost',
+#     'http://127.0.0.1'
+#     # 'http://localhost:3000',
+#     # 'http://127.0.0.1:3000'
+# ]
 
 
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

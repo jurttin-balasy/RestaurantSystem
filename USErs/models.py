@@ -84,7 +84,7 @@ class RestoranAdminmodel(models.Model):
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name='adminler')
     role = models.CharField(default='restaurant_admin')
     is_active = models.BooleanField(default=True, verbose_name="Aktivligi")
-    restaurant = models.ForeignKey(Restaurant, on_delete=models.CASCADE, related_name='admin')
+    restaurant = models.OneToOneField(Restaurant, on_delete=models.CASCADE, related_name='admin')
 
 
     def __str__(self):
