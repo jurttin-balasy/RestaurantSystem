@@ -36,8 +36,11 @@ class RestaurantListSerializer(ModelSerializer):
         fields = ('id', 'name', 'address', 'phone', 'is_active', 'start_time', 'end_time', 'admin')
 
     def get_admin(self, obj):
-        adminler = RestoranAdminmodel.objects.filter(restaurant=obj)
-        serializer = AdminMiniSerializer(adminler)
+        admin = RestoranAdminmodel.objects.filter(restaurant=obj).first()
+        if not admin:
+            return None
+
+        serializer = AdminMiniSerializer(admin)
         return serializer.data
 
 

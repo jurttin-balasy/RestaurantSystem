@@ -426,10 +426,6 @@ class ReceptItemPermission(BasePermission):
 
 
 
-
-
-
-
 class IngredientPermission(BasePermission):
     def has_permission(self, request, view):
         user = request.user
@@ -440,8 +436,7 @@ class IngredientPermission(BasePermission):
         if (admin and getattr(admin, 'restaurant', None)):
             if not getattr(admin, 'is_active', None):
                 self.message = warnings[0]
-                return False
-            
+                return False            
             return True
 
         sklad_xizmetker = getattr(user, 'xizmetkerler', None)
@@ -450,7 +445,6 @@ class IngredientPermission(BasePermission):
                 self.message = warnings[1]
                 return False
             return True
-
 
         if getattr(view, 'action', None) == 'stock_in':
 
