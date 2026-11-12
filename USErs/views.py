@@ -158,7 +158,7 @@ class XizmetkerDetailView(mixins.RetrieveModelMixin,
 
 
    
-
+# Restaurant Adminler
 class RestoranAdminViewSet(viewsets.ModelViewSet):
     queryset = models.RestoranAdminmodel.objects.all()
     serializer_class = RestoranAdminSerializer

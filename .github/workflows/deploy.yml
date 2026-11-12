@@ -1,0 +1,38 @@
+name: CD (Auto Deploy)
+
+# Qashan iske túsedi?
+# Tek 'main' tarmaǵına kod 'push' qılınǵanda.
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Server
+        # SSH arqalı serverge jalǵanatuǵın tayar qural
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: 22
+          # Serverde orınlanatuǵın buyrıqlar:
+          script: |
+            # 1. Proekt papkasına kiriw (Papka atın ózińizdikine ózgertiń!)
+            cd /home/nurdawlet/RestaurantSystem
+
+            # 2. GitHub-tan eń jańa kodtı tartıp alıw
+            echo "Kodtı jańalaw..."
+            git pull origin main
+
+            # 3. Dockerdi jańalaw
+            # -d: Fon rejiminde
+            # --build: Eger Dockerfile ózgergen bolsa, qayta qurıw
+            echo "Dockerdi qayta iske túsiriw..."
+            docker compose up -d --build
+
+            # 4. Eski imidjlerdi hám keshti tazalaw (server tolıp qalmawı ushın)
+            docker system prune -f
