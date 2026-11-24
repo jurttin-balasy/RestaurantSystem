@@ -141,7 +141,7 @@ class CategoryIngredientTableOrderListPermission(BasePermission):
                 if not getattr(admin, 'is_active', None):
                     self.message = warnings[0]
                     return False
-                return request.method in SAFE_METHODS
+                return True
             
 
         if getattr(view, 'action', None) == 'orders':

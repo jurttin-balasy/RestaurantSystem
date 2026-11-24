@@ -2,14 +2,17 @@ from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework import mixins, status
 from django_filters.rest_framework import DjangoFilterBackend
-
+from django.utils import timezone
+from decimal import Decimal
 from rest_framework.response import Response
 from drf_spectacular.utils import extend_schema
-
+from django.db.models import F
 from USErs.serializer import (
     XizmetkerSerializer
 )
 
+from order.models import Order 
+from reservation.models import Reservation 
 
 from .serializers import (
     RestaurantListSerializer, 
@@ -74,10 +77,14 @@ class RestaurantViewSet(viewsets.ModelViewSet):
             return [ReservationPermission()]
 
         if self.action == 'stats':
-            return [AllowAny()]
+            return [IsAdminUser()]
 
         if self.action == 'available_tables':
             return [IsCustomer()]
+
+        if self.action == 'statss':
+            return [RestoranAdminUpdatePermission()]
+
         
         return [CategoryIngredientTableOrderListPermission()]
 
@@ -116,7 +123,7 @@ class RestaurantViewSet(viewsets.ModelViewSet):
 
 
     #restaurants/id/menu/
-    @extend_schema(methods=['GET'], responses={200: MenuSerializer(many=True)})
+    @extend_schema(methods=['GET'], responses={200: MenuSerializer(many=True)},filters=False)
     @action(detail=True, methods=['get'], url_path='menu')
     def menu(self, request, pk=None):
         restaurant = self.get_object()
@@ -132,11 +139,16 @@ class RestaurantViewSet(viewsets.ModelViewSet):
 
 
     # restaurants/id/categories/
+    @extend_schema(methods=['GET'], responses={200: CategoryListSerializer(many=True)}, filters=False)
     @extend_schema(methods=['POST'], request=CategoryListSerializer, responses={201:CategoryListSerializer}, filters=False)
-    @action(detail=True, methods=['post'], url_path='categories')
+    @action(detail=True, methods=['post', 'get'], url_path='categories')
     def categories(self, request, pk=None):
         restaurant = self.get_object()
 
+        if request.method == 'GET':
+            category = restaurant.categories.all()
+            serializer = CategoryListSerializer(category, many=True)
+            return Response(serializer.data, status=status.HTTP_200_OK)
 
         if request.method == 'POST':
             serializer = CategoryListSerializer(data = request.data)
@@ -307,6 +319,86 @@ class RestaurantViewSet(viewsets.ModelViewSet):
 
             status=status.HTTP_200_OK
         )
+
+
+    @extend_schema(methods=['GET'], responses={200:dict})
+    @action(detail=True, methods=['get'], url_path='stats')
+    def statss(self, request, pk=None):
+        restaurant = self.get_object()
+        
+        tables = models.Table.objects.filter(restaurant=restaurant, )
+        
+        orders = Order.objects.filter(restaurant=restaurant)
+
+        open_total = Decimal("0.00")
+        revenue_today = Decimal("0.00")
+        revenue_cash = Decimal("0.00")
+
+        for revenue in orders.filter(status='open'):
+            open_total += revenue.total_order_price
+
+        for revenue in orders.filter(closed_at__date=timezone.localdate()):
+            revenue_today += revenue.total_order_price
+
+            if revenue.payment_method == 'cash':
+                revenue_cash += revenue.total_order_price
+
+        reservations = Reservation.objects.filter(restaurant=restaurant)
+
+        sklad = models.Ingredient.objects.filter(restaurant=restaurant)
+
+        out_names = list(
+            sklad.filter(current_stock__lte=0).values_list("name", flat=True)
+        )
+
+        
+        low_names = list(
+            sklad.filter(current_stock__gt=0, current_stock__lte=F("min_stock"))
+            .values_list("name", flat=True)
+        )
+        dish = models.Dish.objects.filter(category__restaurant=restaurant, is_available=False)
+        return Response(
+            {
+                "tables": {
+                    "total": tables.count(),
+                    "occupied": tables.filter(status='occupied').count(),
+                    "free": tables.filter(status='free').count()
+                },
+
+                "orders": {
+                    "open_count": orders.filter(created_at__date=timezone.localdate()).count(),
+                    "open_total": open_total,
+                    "closed_today_count": orders.filter(closed_at__date=timezone.localdate()).count(),
+                    "revenue_today": revenue_today,
+                    "revenue_cash": revenue_cash,
+                    "revenue_card": revenue_today - revenue_cash
+                },
+
+                "reservations": {
+                    "pending": reservations.filter(status='pending').count(),
+                    "today":  reservations.filter(reservation_date=timezone.localdate()).count()        
+                },
+
+                "stock": {
+                    "out_count": len(out_names),
+                    "low_count": len(low_names),
+                    "out_names": out_names,
+                    "low_names": low_names
+                },
+
+
+                "menu": {
+                    "stop_count": dish.count(),
+                    "stop_names": [
+                        d.name for d in dish
+                    ]
+                }
+            
+
+            }
+        )
+
+        
         
 
 
