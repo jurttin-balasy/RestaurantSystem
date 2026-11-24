@@ -147,9 +147,12 @@ class RestaurantViewSet(viewsets.ModelViewSet):
 
         if request.method == 'GET':
             category = restaurant.categories.all()
-            serializer = CategoryListSerializer(category, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            page = self.paginate_queryset(category)
+            if page is not None:
+                serializer = CategoryListSerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
 
+            
         if request.method == 'POST':
             serializer = CategoryListSerializer(data = request.data)
             if serializer.is_valid():
@@ -168,9 +171,10 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         restaurant = self.get_object()
         if request.method == "GET":
             tables = restaurant.tables.all()
-
-            serializer = TableListSerializer(tables, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            page = self.paginate_queryset(tables)
+            if page is not None:
+                serializer = TableListSerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
 
         if request.method == "POST":
             serializer = TableListSerializer(data=request.data)
@@ -188,8 +192,10 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         restaurant = self.get_object()
         if request.method == "GET":
             ingredients = restaurant.ingredients.all()
-            serializer = IngredientSerializer(ingredients, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            page = self.paginate_queryset(ingredients)
+            if page is not None:
+                serializer = IngredientSerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
 
         if request.method == 'POST':
             serializer = IngredientSerializer(data=request.data)
@@ -209,8 +215,10 @@ class RestaurantViewSet(viewsets.ModelViewSet):
 
         if request.method == 'GET':
             staff = restaurant.staff.all()
-            serializer = XizmetkerSerializer(staff, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            page = self.paginate_queryset(staff)
+            if page is not None:
+                serializer = XizmetkerSerializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
 
         if request.method == "POST":
             serializer = XizmetkerSerializer(data=request.data)
@@ -249,17 +257,24 @@ class RestaurantViewSet(viewsets.ModelViewSet):
     def orders(self, request, pk=None):
         restaurant = self.get_object()
 
+
         if request.method == 'GET':
             xizmetker = getattr(request.user, 'xizmetkerler', None)
             if xizmetker:
-                orders = restaurant.orders.filter(waiter = xizmetker).order_by('-closed_at')
-                serializer = OrderListSerializer(orders, many=True)
-                return Response(serializer.data, status=status.HTTP_200_OK)
 
+                orders = restaurant.orders.filter(waiter = xizmetker).order_by('-closed_at')
+                # serializer = OrderListSerializer(orders, many=True)
+
+                page = self.paginate_queryset(orders)
+                if page is not None:
+                    serializer = OrderListSerializer(page, many=True)
+                    return self.get_paginated_response(serializer.data)
 
             orders = restaurant.orders.all()
-            serializer = OrderListSerializer(orders, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            page = self.paginate_queryset(orders)
+            if page is not None:
+                serializer = OrderListSerializer(page, many=True)
+                return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 
@@ -281,10 +296,13 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         restaurant = self.get_object()
 
         if request.method == 'GET':
-            transactions = models.StockTransaction.objects.filter(ingredient__in=restaurant.ingredients.all()).order_by('-created_at')
-            serializer = StockTransationSerializer(transactions, many=True)
 
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            transactions = models.StockTransaction.objects.filter(ingredient__in=restaurant.ingredients.all()).order_by('-created_at')
+            page = self.paginate_queryset(transactions)
+            if page is not None:
+                serializer = StockTransationSerializer(page, many=True)
+
+                return self.get_paginated_response(serializer.data)
 
 
 
@@ -446,9 +464,11 @@ class CategoryViewSet(mixins.RetrieveModelMixin,
             if not is_admin:
                 dishes = dishes.filter(is_available=True)
 
-
-            serializer = self.get_serializer(dishes, many=True)
-            return Response(serializer.data)
+            page = self.paginate_queryset(dishes)
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
 
         if request.method == "POST":
             serializer = self.get_serializer(data=request.data)

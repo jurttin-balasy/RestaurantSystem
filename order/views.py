@@ -275,7 +275,7 @@ class KDSOrderItemViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = models.OrderItem.objects.all()
     serializer_class = KDSOrderItemSerializer
     permission_classes = [IsAuthenticated, IsKitchenStaffPermission]
-
+    
     def get_queryset(self):
         user = self.request.user
         xizmetker = getattr(user, "xizmetkerler", None)
