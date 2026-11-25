@@ -261,21 +261,17 @@ class RestaurantViewSet(viewsets.ModelViewSet):
         if request.method == 'GET':
             xizmetker = getattr(request.user, 'xizmetkerler', None)
             if xizmetker:
-
                 orders = restaurant.orders.filter(waiter = xizmetker).order_by('-closed_at')
-                # serializer = OrderListSerializer(orders, many=True)
-
                 page = self.paginate_queryset(orders)
                 if page is not None:
                     serializer = OrderListSerializer(page, many=True)
                     return self.get_paginated_response(serializer.data)
-
+                
             orders = restaurant.orders.all()
             page = self.paginate_queryset(orders)
             if page is not None:
                 serializer = OrderListSerializer(page, many=True)
-                return Response(serializer.data, status=status.HTTP_200_OK)
-
+                return self.get_paginated_response(serializer.data)
 
 
         if request.method == 'POST':
