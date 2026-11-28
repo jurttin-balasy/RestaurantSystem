@@ -119,8 +119,8 @@ class TableListSerializer(ModelSerializer):
     class Meta:
         model = models.Table
         fields = ('id', 'restaurant', 'number', 'seats', 'status')
-        read_only_fields = ('restaurant',)
-
+        read_only_fields = ('restaurant', )
+    
 
 class TableBookSerializer(ModelSerializer):
     class Meta:

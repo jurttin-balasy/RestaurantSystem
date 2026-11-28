@@ -5,11 +5,13 @@ from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from decimal import Decimal
 from rest_framework.response import Response
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import extend_schema, OpenApiParameter
 from django.db.models import F
 from USErs.serializer import (
     XizmetkerSerializer
 )
+
+from django.db.models import Exists, OuterRef
 
 from order.models import Order 
 from reservation.models import Reservation 
@@ -50,7 +52,6 @@ class RestaurantViewSet(viewsets.ModelViewSet):
     serializer_class = RestaurantListSerializer
     filter_backends = [filters.SearchFilter, DjangoFilterBackend]
     search_fields = ['name', 'address']
-
     filterset_fields = ['is_active']
 
 
@@ -164,17 +165,55 @@ class RestaurantViewSet(viewsets.ModelViewSet):
 
 
     # restaurants/id/tables/
-    @extend_schema(methods=['get'], responses={200:TableListSerializer(many=True)}, filters=False)
+    @extend_schema(
+        methods=['get'],
+        parameters=[
+            OpenApiParameter(
+                name='status',
+                type=str,
+                location=OpenApiParameter.QUERY,
+                enum=['free', 'occupied', 'reserved'],
+                required=False,
+            )
+        ],           
+        responses={200:TableListSerializer(many=True)}, 
+        filters=False,
+    )
+
+
     @extend_schema(methods=['post'], request=TableListSerializer, responses={201:TableListSerializer}, filters=False)
     @action(detail=True, methods=['get', 'post'], url_path='tables')
+
     def tables(self, request, pk=None):
         restaurant = self.get_object()
         if request.method == "GET":
             tables = restaurant.tables.all()
+            table_status=request.query_params.get('status')
+
+            if table_status:
+                active_reservations = Reservation.objects.filter(
+                    table=OuterRef('pk'),
+                    status__in=['pending', 'confirmed']
+                )
+                tables = tables.annotate(
+                    has_active_reservation=Exists(active_reservations)
+                )
+
+                if table_status == 'reserved':
+                    tables = tables.filter(has_active_reservation=True)
+                elif table_status == 'free':
+                    tables = tables.filter(
+                        status='free', has_active_reservation=False
+                    )
+                elif table_status == 'occupied':
+                    tables = tables.filter(status='occupied')
+
+                
             page = self.paginate_queryset(tables)
             if page is not None:
                 serializer = TableListSerializer(page, many=True)
                 return self.get_paginated_response(serializer.data)
+            
 
         if request.method == "POST":
             serializer = TableListSerializer(data=request.data)
@@ -229,25 +268,25 @@ class RestaurantViewSet(viewsets.ModelViewSet):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
-    # # # restaurants/id/reservations/
+    # # restaurants/id/reservations/
     # @extend_schema(methods=['GET'], responses={200: ReservationListSerializer(many=True)}, filters=False)
-    # @extend_schema(methods=['POST'], request=ReservationCreateSerializer, responses={201: ReservationListSerializer}, filters=False)
-    # @action(detail=True, methods=['get', 'post'], url_path='reservations')
-    # def reservations(self, request, pk=None):
-    #     restaurant = self.get_object()
+    @extend_schema(methods=['POST'], request=ReservationCreateSerializer, responses={201: ReservationListSerializer}, filters=False)
+    @action(detail=True, methods=['post'], url_path='reservations')
+    def reservations(self, request, pk=None):
+        restaurant = self.get_object()
 
-    #     if request.method == "GET":
-    #         reservations = restaurant.reservations.filter(status__in = ['pending', 'confirmed']).select_related('client__user', 'restaurant', 'table').all()
-    #         serializer = self.get_serializer(reservations, many=True)
-    #         return Response(serializer.data, status=status.HTTP_200_OK)
+        # if request.method == "GET":
+        #     reservations = restaurant.reservations.filter(status__in = ['pending', 'confirmed']).select_related('client__user', 'restaurant', 'table').all()
+        #     serializer = self.get_serializer(reservations, many=True)
+        #     return Response(serializer.data, status=status.HTTP_200_OK)
 
-    #     if request.method == "POST":
-    #         serializer = self.get_serializer(data=request.data)
-    #         if serializer.is_valid():
-    #             customer = getattr(request.user, 'customers', None)
-    #             serializer.save(restaurant=restaurant, client=customer)
-    #             return Response(serializer.data, status=status.HTTP_201_CREATED)
-    #         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        if request.method == "POST":
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                customer = getattr(request.user, 'customers', None)
+                serializer.save(restaurant=restaurant, client=customer)
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
     # restaurants/id/orders/
